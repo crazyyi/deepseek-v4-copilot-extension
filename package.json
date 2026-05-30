@@ -1,0 +1,100 @@
+{
+  "name": "deepseek-v4-copilot-extension",
+  "displayName": "Deepseek V4 Copilot Extension",
+  "description": "DeepSeek API provider for VSCode Copilot Chat with spend tracking",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.100.0"
+  },
+  "categories": [
+    "AI"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "languageModelChatProviders": [
+      {
+        "vendor": "deepseek",
+        "displayName": "DeepSeek",
+        "configuration": {
+          "command": "deepseek.setApiKey"
+        }
+      }
+    ],
+    "commands": [
+      {
+        "command": "deepseek.setApiKey",
+        "title": "DeepSeek: Set API Key"
+      },
+      {
+        "command": "deepseek.testApiKey",
+        "title": "DeepSeek: Test API Key"
+      },
+      {
+        "command": "deepseek.showSpend",
+        "title": "DeepSeek: Show Session Spend"
+      },
+      {
+        "command": "deepseek.refreshPricing",
+        "title": "DeepSeek: Refresh Pricing"
+      }
+    ],
+    "configuration": {
+      "properties": {
+        "deepseek.baseUrl": {
+          "type": "string",
+          "default": "https://api.deepseek.com",
+          "description": "DeepSeek API base URL"
+        },
+        "deepseek.maxInputTokens": {
+          "type": "number",
+          "default": 4000,
+          "minimum": 512,
+          "maximum": 64000,
+          "description": "Max input tokens per request. Higher = more context but higher cost."
+        },
+        "deepseek.maxOutputTokens": {
+          "type": "number",
+          "default": 1000,
+          "minimum": 256,
+          "maximum": 8192,
+          "description": "Max output tokens per request. Higher = longer answers but higher cost."
+        },
+        "deepseek.dailyBudgetUSD": {
+          "type": "number",
+          "default": 1,
+          "minimum": 0.1,
+          "description": "Hard spending cap per day. Extension stops at this amount."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "pnpm run package",
+    "compile": "pnpm run check-types && pnpm run lint && node esbuild.js",
+    "watch": "npm-run-all -p watch:*",
+    "watch:esbuild": "node esbuild.js --watch",
+    "watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
+    "package": "pnpm run check-types && pnpm run lint && node esbuild.js --production",
+    "compile-tests": "tsc -p . --outDir out",
+    "watch-tests": "tsc -p . -w --outDir out",
+    "pretest": "pnpm run compile-tests && pnpm run compile && pnpm run lint",
+    "check-types": "tsc --noEmit",
+    "lint": "eslint src",
+    "test": "vscode-test"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.120.0",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "22.x",
+    "typescript-eslint": "^8.56.1",
+    "eslint": "^9.39.3",
+    "esbuild": "^0.27.3",
+    "npm-run-all": "^4.1.5",
+    "typescript": "^5.9.3",
+    "@vscode/test-cli": "^0.0.12",
+    "@vscode/test-electron": "^2.5.2"
+  }
+}
