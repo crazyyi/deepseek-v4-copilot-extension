@@ -2,7 +2,7 @@
 import { defineConfig } from "@vscode/test-cli";
 
 export default defineConfig({
-  files: "out/test/**/*.test.js",
+  files: "dist/test/**/*.test.js",
   version: "1.100.0",
   // ✅ Short path fixes the socket > 103 chars crash
   workspaceFolder: "./test-workspace",
