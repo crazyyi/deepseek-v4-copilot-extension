@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "outDir": "dist/test",
+    "types": ["vitest/globals", "mocha", "node"]
+  },
+  "include": ["src/test/**/*", "src/**/*"]
+}
