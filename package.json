@@ -2,7 +2,7 @@
   "name": "deepseek-v4-copilot-extension",
   "displayName": "Deepseek V4 Copilot Extension",
   "description": "DeepSeek API provider for VSCode Copilot Chat with spend tracking",
-  "version": "0.1.1",
+  "version": "0.1.3",
   "publisher": "AaronZengExtensions",
   "icon": "assets/extension-icon.png",
   "repository": {
@@ -41,6 +41,10 @@
       {
         "command": "deepseek.showSpend",
         "title": "DeepSeek: Show Session Spend"
+      },
+      {
+        "command": "deepseek.setMaxInputTokens",
+        "title": "DeepSeek: Set Max Input Tokens"
       },
       {
         "command": "deepseek.refreshPricing",

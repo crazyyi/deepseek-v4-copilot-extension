@@ -10,6 +10,20 @@ export function activate(context: vscode.ExtensionContext) {
 		vscode.lm.registerLanguageModelChatProvider('deepseek', provider)
 	);
 
+	// Create status bar item to display current maxInputTokens
+	const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
+	statusBarItem.command = 'deepseek.setMaxInputTokens';
+	context.subscriptions.push(statusBarItem);
+
+	const updateStatusBar = async () => {
+		const tokens = await provider.getStoredMaxInputTokens();
+		statusBarItem.text = `$(settings) DeepSeek: ${tokens} tokens`;
+		statusBarItem.tooltip = 'Click to change max input tokens';
+		statusBarItem.show();
+	};
+
+	updateStatusBar();
+
 	context.subscriptions.push(
 		vscode.commands.registerCommand('deepseek.setApiKey', async () => {
 			const key = await vscode.window.showInputBox({
@@ -58,7 +72,7 @@ export function activate(context: vscode.ExtensionContext) {
 			const spend = await provider.getSessionSpend();
 			const pricing = await provider.getCurrentPricing();
 
-			const msg = `Session spend: $${spend.toFixed(4)} USD\n\nCurrent rates:\nChat in: $${pricing['deepseek-chat'].input}/M  out: $${pricing['deepseek-chat'].output}/M\nReasoner in: $${pricing['deepseek-reasoner'].input}/M  out: $${pricing['deepseek-reasoner'].output}/M`;
+			const msg = `Session spend: $${spend.toFixed(4)} USD\n\nCurrent rates:\nV4-Flash in: $${pricing['deepseek-v4-flash'].input}/M  out: $${pricing['deepseek-v4-flash'].output}/M\nV4-Pro in: $${pricing['deepseek-v4-pro'].input}/M  out: $${pricing['deepseek-v4-pro'].output}/M`;
 
 			vscode.window.showInformationMessage(msg, { modal: true });
 		})
@@ -78,6 +92,27 @@ export function activate(context: vscode.ExtensionContext) {
 					vscode.window.showErrorMessage(`Failed to refresh pricing: ${e.message}`);
 				}
 			});
+		})
+	);
+
+	context.subscriptions.push(
+		vscode.commands.registerCommand('deepseek.setMaxInputTokens', async () => {
+			const currentTokens = await provider.getStoredMaxInputTokens();
+			const input = await vscode.window.showInputBox({
+				prompt: 'Enter maximum input tokens (e.g., 4000, 8000, 16000)',
+				value: currentTokens.toString(),
+				validateInput: (value) => {
+					const num = parseInt(value, 10);
+					return isNaN(num) || num <= 0 ? 'Enter a positive number' : '';
+				}
+			});
+
+			if (input) {
+				const tokens = parseInt(input, 10);
+				await context.globalState.update('deepseek.maxInputTokens', tokens);
+				await updateStatusBar();
+				vscode.window.showInformationMessage(`Max input tokens set to ${tokens}`);
+			}
 		})
 	);
 }

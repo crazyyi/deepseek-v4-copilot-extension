@@ -6,10 +6,11 @@ import * as sinon from 'sinon';
 const mockProviderInstance = {
 	getSessionSpend: vi.fn().mockResolvedValue(0),
 	getCurrentPricing: vi.fn().mockResolvedValue({
-		'deepseek-chat': { input: 0.14, output: 0.28 },
-		'deepseek-reasoner': { input: 0.55, output: 2.19 }
+		'deepseek-v4-flash': { input: 0.14, output: 0.28 },
+		'deepseek-v4-pro': { input: 0.435, output: 0.87 }
 	}),
 	refreshPricing: vi.fn().mockResolvedValue(undefined),
+	getStoredMaxInputTokens: vi.fn().mockResolvedValue(4000),
 };
 
 vi.mock('vscode', () => {
@@ -26,6 +27,7 @@ vi.mock('vscode', () => {
 			showInformationMessage: vi.fn(),
 			showErrorMessage: vi.fn(),
 			withProgress: vi.fn(),
+			createStatusBarItem: vi.fn(() => ({ command: '', text: '', tooltip: '', show: vi.fn() })),
 		},
 		Uri: {
 			file: vi.fn((path: string) => ({ fsPath: path, toString: () => path })),
@@ -36,6 +38,10 @@ vi.mock('vscode', () => {
 			Notification: 15,
 			Window: 10,
 			SourceControl: 1,
+		},
+		StatusBarAlignment: {
+			Left: 0,
+			Right: 1,
 		},
 	};
 });
@@ -62,10 +68,11 @@ describe('DeepSeek Extension Tests', () => {
 		// reset all mock provider methods before each test
 		mockProviderInstance.getSessionSpend.mockReset().mockResolvedValue(0);
 		mockProviderInstance.getCurrentPricing.mockReset().mockResolvedValue({
-			'deepseek-chat': { input: 0.14, output: 0.28 },
-			'deepseek-reasoner': { input: 0.55, output: 2.19 }
+			'deepseek-v4-flash': { input: 0.14, output: 0.28 },
+			'deepseek-v4-pro': { input: 0.435, output: 0.87 }
 		});
 		mockProviderInstance.refreshPricing.mockReset().mockResolvedValue(undefined);
+		mockProviderInstance.getStoredMaxInputTokens.mockReset().mockResolvedValue(4000);
 
 		context = {
 			subscriptions: [],
@@ -104,16 +111,17 @@ describe('DeepSeek Extension Tests', () => {
 		assert.strictEqual(stub.firstCall.args[0], 'deepseek');
 	});
 
-	test('activate registers all 4 commands', () => {
+	test('activate registers all 5 commands', () => {
 		activate(context);
 		const reg = vscode.commands.registerCommand as sinon.SinonStub;
-		assert.strictEqual(reg.callCount, 4);
+		assert.strictEqual(reg.callCount, 5);
 		const cmds = reg.getCalls().map(c => c.args[0]);
 		assert.deepStrictEqual(cmds, [
 			'deepseek.setApiKey',
 			'deepseek.testApiKey',
 			'deepseek.showSpend',
-			'deepseek.refreshPricing'
+			'deepseek.refreshPricing',
+			'deepseek.setMaxInputTokens'
 		]);
 	});
 
@@ -215,8 +223,8 @@ describe('DeepSeek Extension Tests', () => {
 
 		const msg = (vscode.window.showInformationMessage as sinon.SinonStub).firstCall.args[0];
 		assert.ok(msg.includes('Session spend: $0.1234 USD'));
-		assert.ok(msg.includes('Chat in: $0.14/M'));
-		assert.ok(msg.includes('Reasoner in: $0.55/M'));
+		assert.ok(msg.includes('V4-Flash in: $0.14/M'));
+		assert.ok(msg.includes('V4-Pro in: $0.435/M'));
 	});
 
 	test('deepseek.refreshPricing calls provider.refreshPricing', async () => {
@@ -246,5 +254,72 @@ describe('DeepSeek Extension Tests', () => {
 		assert.ok((vscode.window.showErrorMessage as sinon.SinonStub).calledWith(
 			'Failed to refresh pricing: Network error'
 		));
+	});
+
+	test('deepseek.setMaxInputTokens sets token value and saves to globalState', async () => {
+		mockProviderInstance.getStoredMaxInputTokens.mockResolvedValue(4000);
+
+		activate(context);
+		const cb = (vscode.commands.registerCommand as sinon.SinonStub)
+			.getCalls().find(c => c.args[0] === 'deepseek.setMaxInputTokens')!.args[1];
+
+		(vscode.window.showInputBox as sinon.SinonStub).resolves('8000');
+		await cb();
+
+		assert.ok((context.globalState.update as sinon.SinonStub).calledWith('deepseek.maxInputTokens', 8000));
+		assert.ok((vscode.window.showInformationMessage as sinon.SinonStub).calledWith(
+			'Max input tokens set to 8000'
+		));
+	});
+
+	test('deepseek.setMaxInputTokens shows current value in input box', async () => {
+		mockProviderInstance.getStoredMaxInputTokens.mockResolvedValue(6000);
+
+		activate(context);
+		const cb = (vscode.commands.registerCommand as sinon.SinonStub)
+			.getCalls().find(c => c.args[0] === 'deepseek.setMaxInputTokens')!.args[1];
+
+		(vscode.window.showInputBox as sinon.SinonStub).resolves('6000');
+		await cb();
+
+		const inputBoxCall = (vscode.window.showInputBox as sinon.SinonStub).firstCall.args[0];
+		assert.strictEqual(inputBoxCall.value, '6000');
+	});
+
+	test('deepseek.setMaxInputTokens ignores if user cancels', async () => {
+		mockProviderInstance.getStoredMaxInputTokens.mockResolvedValue(4000);
+
+		activate(context);
+		const cb = (vscode.commands.registerCommand as sinon.SinonStub)
+			.getCalls().find(c => c.args[0] === 'deepseek.setMaxInputTokens')!.args[1];
+
+		(vscode.window.showInputBox as sinon.SinonStub).resolves(undefined);
+		await cb();
+
+		assert.ok((context.globalState.update as sinon.SinonStub).notCalled);
+		assert.ok((vscode.window.showInformationMessage as sinon.SinonStub).notCalled);
+	});
+
+	test('deepseek.setMaxInputTokens validates input (rejects non-positive numbers)', async () => {
+		mockProviderInstance.getStoredMaxInputTokens.mockResolvedValue(4000);
+
+		activate(context);
+		const cb = (vscode.commands.registerCommand as sinon.SinonStub)
+			.getCalls().find(c => c.args[0] === 'deepseek.setMaxInputTokens')!.args[1];
+
+		(vscode.window.showInputBox as sinon.SinonStub).resolves('4000');
+		await cb();
+
+		const inputBoxCall = (vscode.window.showInputBox as sinon.SinonStub).firstCall.args[0];
+		const validator = inputBoxCall.validateInput;
+
+		// Test valid input
+		assert.strictEqual(validator('5000'), '');
+
+		// Test invalid inputs
+		assert.strictEqual(validator('0'), 'Enter a positive number');
+		assert.strictEqual(validator('-100'), 'Enter a positive number');
+		assert.strictEqual(validator('abc'), 'Enter a positive number');
+		assert.strictEqual(validator(''), 'Enter a positive number');
 	});
 });

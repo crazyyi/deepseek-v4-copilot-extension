@@ -32,6 +32,7 @@ function convertMessages(messages: readonly vscode.LanguageModelChatRequestMessa
 export class DeepSeekProvider implements vscode.LanguageModelChatProvider {
   private sessionSpendUSD = 0;
   private readonly DAILY_BUDGET = 1.0; // $1/day = $20/20days
+  private readonly DEFAULT_MAX_INPUT_TOKENS = 4000;
   private outputChannel: vscode.OutputChannel;
 
   // Default pricing per 1M tokens (cache miss). Updated by refreshPricing()
@@ -46,17 +47,22 @@ export class DeepSeekProvider implements vscode.LanguageModelChatProvider {
     this.outputChannel.appendLine('DeepSeek provider initialized');
   }
 
+  private getMaxInputTokens(): number {
+    return this.context.globalState.get<number>('deepseek.maxInputTokens') ?? this.DEFAULT_MAX_INPUT_TOKENS;
+  }
+
   async provideLanguageModelChatInformation(
     options: { silent: boolean },
     _token: vscode.CancellationToken
   ): Promise<vscode.LanguageModelChatInformation[]> {
+    const maxInputTokens = this.getMaxInputTokens();
     return [
       {
         id: 'deepseek-v4-flash',
         name: 'DeepSeek V4-Flash',
         family: 'deepseek',
         version: '1.0.0',
-        maxInputTokens: 4000,
+        maxInputTokens,
         maxOutputTokens: 1000,
         capabilities: { toolCalling: true, imageInput: false },
       },
@@ -65,7 +71,7 @@ export class DeepSeekProvider implements vscode.LanguageModelChatProvider {
         name: 'DeepSeek V4 Pro (Thinking)',
         family: 'deepseek',
         version: '1.0.0',
-        maxInputTokens: 4000,
+        maxInputTokens,
         maxOutputTokens: 1000,
         capabilities: { toolCalling: true, imageInput: false },
         detail: 'Extended reasoning mode with step-by-step thinking',
@@ -217,6 +223,10 @@ export class DeepSeekProvider implements vscode.LanguageModelChatProvider {
       'deepseek-v4-pro': { input: 0.435, output: 0.87 }
     };
     this.outputChannel.appendLine(`Pricing refreshed: ${JSON.stringify(this.pricing)}`);
+  }
+
+  async getStoredMaxInputTokens(): Promise<number> {
+    return this.getMaxInputTokens();
   }
 
   private addCost(inputTokens: number, outputTokens: number, modelId: string) {
